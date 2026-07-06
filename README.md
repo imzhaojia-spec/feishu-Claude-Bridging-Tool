@@ -108,7 +108,8 @@ node check.js
 | Windows | 双击 `start.bat` |
 | Mac / Linux | 终端运行 `chmod +x start.sh && ./start.sh` |
 
-> Windows 用户提示：可以右键 `start.bat` → 创建快捷方式 → 拖到桌面 → 右键改图标，以后双击桌面图标就能启动。
+> 桌面快捷方式：双击 `setup-desktop.bat` → 桌面自动生成「飞书桥接」图标，以后双击就能启动。
+> 右键快捷方式 → 属性 → 更改图标 可以换你喜欢的图标。
 
 ### 7. 完成绑定
 
