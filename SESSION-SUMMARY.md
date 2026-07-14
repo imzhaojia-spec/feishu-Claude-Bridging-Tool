@@ -1,7 +1,8 @@
 # 飞书桥接 — 会话总结
 
-> 2026-07-04 ~ 2026-07-06
+> 2026-07-04 ~ 2026-07-14
 > v1.1 安全加固: 2026-07-06
+> v1.1.1 bug 修复: 2026-07-14
 
 ---
 
@@ -30,7 +31,7 @@
 
 ---
 
-## 三、已解决（v1.1 安全加固 · 2026-07-06）
+## 三、已解决（v1.1 安全加固 · 2026-07-06 / v1.1.1 bug 修复 · 2026-07-14）
 
 | 问题 | 解决方案 | 改动文件 |
 |------|---------|---------|
@@ -39,6 +40,7 @@
 | 陌生人试探无感知 | 未授权访问追踪（3 次/10 次分级告警） | main.js |
 | `/cd` 无路径限制 | `isDangerousPath()` 拒绝系统关键目录 | main.js |
 | 启动时安全状态不可见 | `printSecuritySummary()` 启动安全摘要 | main.js |
+| **detectDeepSeekError 误判（v1.1.1）** | 判断顺序颠倒：先扫 error regex 再解析 JSON，stderr 无害 warning 含 "402" 等状态码时误判为欠费。修复：JSON 解析优先 → 正则加 `\b` 词边界 → 诊断日志 | claude-exec.js |
 
 ## 四、未解决 / 待讨论
 
@@ -46,7 +48,6 @@
 |------|------|
 | README 里的截图占位 | 需要真实的飞书管理后台截图（创建应用 6 步） |
 | 无自动化测试 | `package.json` 无 `test` 脚本——当前靠 `node --check` + 手动功能测试 |
-| Git 仓库未建 | 代码在本地，未 push 到远程——发给别人要通过 ZIP 或建仓库 |
 | `state/` 目录权限 | Unix 下未设 700（其他用户可读 session 映射） |
 
 ---
@@ -54,11 +55,14 @@
 ## 五、接下来要做的事
 
 1. **截屏** — 飞书开放平台创建应用的 6 个步骤截图，放进 README.md 的截图占位处
-2. **建 Git 仓库** — `feishu-bridge-dist` 初始化 git → push 到 GitHub/GitLab → 别人可以 clone
-3. **测完整链路** — 重启你的个人版桥接，飞书发 `你好`，验证自动绑定 + 白名单写入 + 重启后白名单模式
-4. **（可选）Mac/Linux 实测** — 找一台 Mac 或 Linux 机器跑 `check.js` + `./start.sh`，验证跨平台无问题
-5. **（可选）桌面图标** — 右键 `start.bat` → 创建快捷方式 → 换图标 → 拖桌面，以后双击启动
-6. **（可选）state/ 权限** — Unix 下 `chmod 700 state/`，3 行代码
+2. **测完整链路** — 重启你的个人版桥接，飞书发 `你好`，验证自动绑定 + 白名单写入 + 重启后白名单模式
+3. **（可选）Mac/Linux 实测** — 找一台 Mac 或 Linux 机器跑 `check.js` + `./start.sh`，验证跨平台无问题
+4. **（可选）state/ 权限** — Unix 下 `chmod 700 state/`，3 行代码
+
+### 已完成（v1.1 发布）
+- ✅ Git 仓库已建 → push 到 `https://github.com/imzhaojia-spec/feishu-Claude-Bridging-Tool`
+- ✅ 桌面快捷方式 → `setup-desktop.bat` 一键创建「飞书桥接.lnk」到桌面
+- ✅ README 凭证占位 → 真实 App ID/Secret 已替换为 `cli_xxxxxxxxxxxx`
 
 ---
 

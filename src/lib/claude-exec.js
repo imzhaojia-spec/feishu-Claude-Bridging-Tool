@@ -47,20 +47,17 @@ function execute(sessionId, prompt, options = {}) {
 
     proc.on('close', (code) => {
       clearTimeout(timer);
-      const combined = stderr + stdout;
 
-      const dsErr = detectDeepSeekError(combined);
-      if (dsErr) {
-        resolve({ error: dsErr, sessionId, exitCode: code });
-        return;
-      }
-
+      // 被 kill（超时）→ 直接返回
       if (code === null || proc.killed) {
         resolve({ error: { type: 'timeout' }, sessionId, exitCode: code });
         return;
       }
 
-      // 解析 JSON — stdout 可能含多行（首行 stderr warning + 末行 JSON）
+      // ── 优先解析 JSON ──
+      // Claude 正常退出时 stderr 可能含无害的 warning / retry 日志，
+      // 如果先扫错误正则再解析 JSON，stderr 中的 "402" 等字串会误判为 API 欠费。
+      // 正确的顺序：先看有没有正常结果，没有再查错误。
       let parsed = null;
       for (const line of stdout.split('\n')) {
         const trimmed = line.trim();
@@ -71,7 +68,7 @@ function execute(sessionId, prompt, options = {}) {
       }
 
       if (parsed) {
-        // 返回完整数据：result + session_id + 上下文统计
+        // 有合法 JSON → 返回正常结果（忽略 stderr 中的干扰信息）
         resolve({
           result: parsed.result || '',
           sessionId: parsed.session_id || sessionId,
@@ -81,7 +78,18 @@ function execute(sessionId, prompt, options = {}) {
         return;
       }
 
+      // ── JSON 解析失败 → 检查是否为已知 API 错误 ──
+      const combined = stderr + stdout;
+      const dsErr = detectDeepSeekError(combined);
+      if (dsErr) {
+        console.warn(`[claude] API 错误 [${dsErr.type}] status=${dsErr.status} exit=${code}`);
+        resolve({ error: dsErr, sessionId, exitCode: code });
+        return;
+      }
+
+      // ── 非零退出码且无匹配错误 ──
       if (code !== 0) {
+        console.warn(`[claude] 异常退出: code=${code} stderr=${stderr.slice(0, 200).replace(/\n/g, '\\n')}`);
         resolve({ error: { type: 'crash', message: combined.slice(-300) }, sessionId, exitCode: code });
         return;
       }
@@ -127,12 +135,38 @@ function extractMeta(parsed) {
   };
 }
 
+// 从 Claude 进程输出中检测 DeepSeek API 错误
+// ⚠️ 仅在 JSON 解析失败后调用——正常 JSON 响应优先于错误模式匹配
+// ⚠️ 数字状态码必须用 \b 词边界，防止子串误匹配：
+//    反例：token 数 40200、耗时 14025ms 含 "402"/"402" 会被误判为欠费
 function detectDeepSeekError(text) {
-  if (/429|too many requests/i.test(text)) return { type: 'rate_limit', status: 429 };
-  if (/503|service unavailable/i.test(text)) return { type: 'unavailable', status: 503 };
-  if (/402|payment required|insufficient.*balance/i.test(text)) return { type: 'payment', status: 402 };
-  if (/401|unauthorized|invalid.*api.?key/i.test(text)) return { type: 'auth', status: 401 };
+  if (/\b429\b|too many requests/i.test(text)) {
+    console.warn(`[claude] DeepSeek 429 限流 → ${snippet(text, /429|too many requests/i)}`);
+    return { type: 'rate_limit', status: 429 };
+  }
+  if (/\b503\b|service unavailable/i.test(text)) {
+    console.warn(`[claude] DeepSeek 503 不可用 → ${snippet(text, /503|service unavailable/i)}`);
+    return { type: 'unavailable', status: 503 };
+  }
+  if (/\b402\b|payment required|insufficient.*balance/i.test(text)) {
+    console.warn(`[claude] DeepSeek 402 欠费 → ${snippet(text, /402|payment required|insufficient.*balance/i)}`);
+    return { type: 'payment', status: 402 };
+  }
+  if (/\b401\b|unauthorized|invalid.*api.?key/i.test(text)) {
+    console.warn(`[claude] DeepSeek 401 认证失败 → ${snippet(text, /401|unauthorized|invalid.*api.?key/i)}`);
+    return { type: 'auth', status: 401 };
+  }
   return null;
+}
+
+// 提取匹配位置前后 40 字符作为诊断片段
+function snippet(text, pattern) {
+  const match = text.match(pattern);
+  if (!match) return '(未匹配)';
+  const idx = match.index;
+  const start = Math.max(0, idx - 40);
+  const end = Math.min(text.length, idx + match[0].length + 40);
+  return JSON.stringify(text.slice(start, end).replace(/\s+/g, ' ').trim());
 }
 
 // Claude 只认真实 UUID（8-4-4-4-12），自定义 ID 会导致 --resume 报错

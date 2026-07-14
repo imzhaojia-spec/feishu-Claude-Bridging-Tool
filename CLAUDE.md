@@ -11,9 +11,11 @@
 ```
 feishu-bridge-dist/
 ├── start.bat / start.sh    # 进程监督（崩溃自动重启）
+├── setup-desktop.bat / .ps1# 桌面快捷方式一键创建
 ├── check.js                # 启动前环境自检
 ├── README.md               # 安装文档
 ├── COMMANDS.md             # 飞书命令速查表
+├── LICENSE                 # MIT
 ├── .env / .env.example     # 飞书凭证配置
 ├── src/
 │   ├── main.js             # 入口：WS 连接 + 授权 + 命令路由 + Claude 调用
@@ -82,6 +84,10 @@ sender_id 在 FEISHU_ALLOWED_USERS（.env 白名单）？
 | Token 过期 | 调用前自动刷新 |
 | Claude 超时（5min） | kill + 飞书提示 |
 | Claude 崩溃 | 飞书通知退出码 |
+| DeepSeek 429 限流 | 飞书提示"请稍后重试"（不自动重试） |
+| DeepSeek 503 不可用 | 飞书提示"服务暂不可用"（不自动重试） |
+| DeepSeek 402 欠费 | 飞书提示"API 余额不足" |
+| DeepSeek 401 认证失败 | 飞书通知退出码 |
 | 飞书发送失败 | 内存重试 2 次 → 写死信审计（不存原文） |
 | 进程崩溃 | `uncaughtException` → exit(1) → 启动脚本重启 |
 | .jsonl 损坏 | 读取时截断损坏行 |
